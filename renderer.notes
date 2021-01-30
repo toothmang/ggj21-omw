@@ -1,0 +1,33 @@
+
+
+Noise Functions
+    https://www.npmjs.com/package/simplenoise
+    Imported through UNPKG.com.
+
+    From their package page:
+
+        The library exposes an object called noise with the following properties:
+
+            simplex2(x, y): 2D Simplex noise function
+            simplex3(x, y, z): 3D Simplex noise function
+            perlin2(x, y): 2D Perlin noise function
+            perlin3(x, y, z): 3D Perlin noise function
+            seed(val): Seed the noise functions. Only 65536 different seeds are supported. Use a float between 0 and 1 or an integer from 1 to 65536.
+
+
+User Interface
+    Default FirstPersonControls from THREE.JS
+    import { FirstPersonControls } from 'https://unpkg.com/three/examples/jsm/controls/FirstPersonControls.js';
+
+    Hooked into DOM during creation with:
+        controls = new FirstPersonControls( camera, renderer.domElement );
+
+    Update function called once per frame with:
+        renderer.render( scene, camera );
+
+
+Coordinate Systems
+    "world_progress" is the progress along the (infinite?) map in the forward (-z) direction.
+    It is subtracted from the "progress" of any given entity to determine the Z coordinate.
+    world_progress - X will put the entity X units AHEAD of the player.
+    Units are destroyed when they are progress_threshold units BEHIND the player. No turning back!
