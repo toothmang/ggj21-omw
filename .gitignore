@@ -2,3 +2,8 @@
 *.java
 *.jar
 *.class
+
+#Node shits all over the place
+node_modules/
+dist/
+.cache
