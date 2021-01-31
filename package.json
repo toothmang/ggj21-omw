@@ -7,8 +7,11 @@
     "clean": "rm dist/*",
     "start": "node server.js",
     "play": "NODE_ENV=production node server.js",
-    "build": "npm run parcel:build ; scripts/crappy_include.py dist/index.html PUTGAMEHERE game.html",
-    "parcel:build": "parcel build index.html --no-source-maps --no-minify",
+    "localplay": "NODE_ENV=local node server.js",
+    "localbuild": "NODE_ENV=local npm run build",
+    "build": "npm run parcel:build ; npm run postbuild",
+    "postbuild": "scripts/crappy_include.py dist/index.html PUTGAMEHERE infinite_intro.js ; scripts/crappy_include.py dist/index.html PUTNOBUNDLEFUCKHERE nobundles.snip",
+    "parcel:build": "parcel build index.html --no-source-maps --no-minify ; scripts/copy_libs.sh",
     "pm2:start": "NODE_ENV=production pm2 start server.js --max-memory-restart 240M",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

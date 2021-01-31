@@ -11,11 +11,13 @@ const geckos = require('@geckos.io/client').default
 console.log("Clienting!");
 
 serverObjects = {};
-
+playerObjects = {};
 
 
 window.addEventListener('load', () => {
-    const channel = geckos({ port: 443, portRange: { min: 50000, max: 51000 }, })
+    port = 443
+    if (process.env.NODE_ENV === 'local') port = 9208
+    const channel = geckos({ port: port, portRange: { min: 50000, max: 51000 }, })
 
     channel.onConnect(error => {
         if (error) console.error(error.message)
@@ -81,8 +83,10 @@ window.addEventListener('load', () => {
 
         channel.on('updateObjects', updates => {
             serverObjects = JSON.parse(updates[0])
-            //let parsedUpdates = parseUpdates(updates[0])
-            //updatesHandler(parsedUpdates)
+        })
+
+        channel.on('updatePlayers', updates => {
+            playerObjects = JSON.parse(updates[0])
         })
     })
 
