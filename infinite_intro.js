@@ -4,7 +4,7 @@ import { FirstPersonControls } from 'https://unpkg.com/three/examples/jsm/contro
 
 //noise.seed(Math.random());
 
-let camera, controls, scene, renderer;
+let camera, controls, scene, renderer, gamepad;
 
 let grid0, grid1, geometry, material, clock;
 //let noise2D = makeNoise2D(0);
@@ -15,6 +15,10 @@ const junkCount = 150;
 const gridspan = 20000;
 const virtualSpeed = 5000;
 const progress_threshold = 1000;
+const movementSpeed = 1000;
+const lookSpeed = 0.05;
+const controllerLookSpeed = 2.0;
+const cameraOffset = 500.0;
 var world_progress = 0;
 var space_junk = [];
 var space_junk_worldcoords = [];
@@ -22,6 +26,9 @@ var space_junk_worldcoords = [];
 var world_object_store = []; // Array of {mesh, x, y, p}
 var spherepool;
 var playerpool = {};    // Dictionary of playerId: mesh
+
+// For third-person camera
+var playerObj;
 
 function fract(x) {
     return x - Math.floor(x);
@@ -172,9 +179,10 @@ function init() {
     document.body.appendChild(renderer.domElement);
 
     controls = new FirstPersonControls(camera, renderer.domElement);
-
-    controls.movementSpeed = 500;
+    controls.movementSpeed = movementSpeed;
     controls.lookSpeed = 0.05;
+
+    gamepad = new GamepadControls();
 
     //
 
@@ -182,7 +190,17 @@ function init() {
 
     spherepool = new object_pool(scene, new_sphere_mesh);
 
-    //playerpool = new object_pool(scene, new_box_mesh);
+
+    goal = new THREE.Object3D;
+    follow = new THREE.Object3D;
+    
+    playerObj = new THREE.Object3D;
+    playerObj.position.set(0, 200, 0);
+    playerObj.add(camera);
+    camera.position.set(0, 200, cameraOffset);
+    //follow.add(camera);
+    
+    //follow.position.set = (0, 0, -cameraOffset);
 }
 
 function onWindowResize() {
@@ -202,6 +220,8 @@ function animate() {
 
     requestAnimationFrame(animate);
 
+    gamepad.update();
+
     render();
 
 }
@@ -212,6 +232,39 @@ function render() {
     const time = clock.getElapsedTime() * 10;
 
     world_progress += virtualSpeed * delta;
+
+    if (gamepad.leftStickHeld) {
+        let actualMoveSpeed = movementSpeed * delta;
+
+        if (gamepad.leftStick[0] != 0) {
+            playerObj.translateX(actualMoveSpeed * gamepad.leftStick[0]);
+        }
+        if (gamepad.leftStick[1] != 0) {
+            // Use this line for forward/backwards control
+            playerObj.translateZ(actualMoveSpeed * gamepad.leftStick[1]);
+
+            // Use this for quadcopter-style up/down control
+            //playerObj.translateY(-actualMoveSpeed * gamepad.leftStick[1]);
+        }
+    }
+
+    if (gamepad.rightStickHeld) {
+        controls.enabled = false;
+        let actualTurnSpeed = controllerLookSpeed * delta;
+
+        if (gamepad.rightStick[0] != 0) {
+            let yrot = actualTurnSpeed * gamepad.rightStick[0];
+            playerObj.rotateY(yrot);
+        }
+        if (gamepad.rightStick[1] != 0) {
+            let xrot = actualTurnSpeed * gamepad.rightStick[1];
+            playerObj.rotateX(xrot);
+        }
+
+        //controls.enabled = true;
+    }
+
+    camera.lookAt(playerObj.position);
 
     // const position = geometry.attributes.position;
     //
@@ -283,16 +336,15 @@ function render() {
 
     if (channel) {
         channel.emit("playerMove", {
-            x: camera.position.x,
-            y: camera.position.y,
-            z: camera.position.z,
-            qx: camera.quaternion.x,
-            qy: camera.quaternion.y,
-            qz: camera.quaternion.z,
-            qw: camera.quaternion.w,
+            x: playerObj.position.x,
+            y: playerObj.position.y,
+            z: playerObj.position.z,
+            qx: playerObj.quaternion.x,
+            qy: playerObj.quaternion.y,
+            qz: playerObj.quaternion.z,
+            qw: playerObj.quaternion.w,
         });
     }
-    
 
     renderer.render(scene, camera);
 }
