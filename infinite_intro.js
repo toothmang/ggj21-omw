@@ -206,6 +206,11 @@ function init() {
     controls.movementSpeed = movementSpeed;
     controls.lookSpeed = 0.05;
     controls.rollSpeed = controllerLookSpeed;
+    controls.enabled = true;
+
+    renderer.domElement.addEventListener("mousemove", () => {
+        controls.enabled = true;
+    });
 }
 
 function onWindowResize() {
@@ -265,8 +270,6 @@ function render() {
             let xrot = actualTurnSpeed * gamepad.rightStick[1];
             playerObj.rotateX(xrot);
         }
-
-        //controls.enabled = true;
     }
 
     camera.lookAt(playerObj.position);
@@ -318,7 +321,10 @@ function render() {
 
     spherepool.update(clock.getElapsedTime(), world_progress);
 
-    controls.update(delta);
+    if (controls.enabled) {
+        controls.update(delta);
+    }
+    
 
     for (let playerId in window.playerObjects) {
         if (!(playerId in playerpool)) {
