@@ -1,7 +1,7 @@
 {
-  "name": "ammo_test",
+  "name": "omw",
   "version": "1.0.0",
-  "description": "",
+  "description": "A 2THS1M Jam B) This year's jam is about: _something_. Or is it?",
   "main": "index.js",
   "scripts": {
     "clean": "rm dist/*",
@@ -12,7 +12,7 @@
     "pm2:start": "NODE_ENV=production pm2 start server.js --max-memory-restart 240M",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "",
+  "author": "2THS1M",
   "license": "ISC",
   "dependencies": {
     "@enable3d/ammo-on-nodejs": "^0.21.0",
@@ -23,5 +23,10 @@
     "cors": "^2.8.5",
     "express": "^4.17.1",
     "parcel": "^1.12.4"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "/home/git/ggj21"
+  },
+  "devDependencies": {}
 }
