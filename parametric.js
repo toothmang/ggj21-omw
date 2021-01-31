@@ -5,18 +5,45 @@ function parametric(t, progress) {
     return {x:pt.x, y:pt.y, z:pt.z - progress}; // Do not subtract -progress
 }
 
-function stationary(x,y,z,init_progress) {
-    return function(t, progress) {
-        //return {x:x, y:y, z:z + progress - init_progress}
-        return {x:x, y:y, z:z + progress - init_progress}
+function stationary(args) { // (x,y,z,progress)
+    return function(t, p) {
+        //return {x:x, y:y, z:z + p - progress}
+        return {x:args.x, y:args.y, z:args.z + p - args.progress}
     }
 }
 
-function kamikaze_from_left(t0, progress) {
-    return function(t, progress) {
-        return {x:(t-t0) * 1000 - 10000,
-                y: 200 + 1000 / (0.01+t-t0),
-                z: -10000 + Math.pow(t-t0, 4)
+function kamikaze_from_side(args) { // (t0, progress, left=true)
+    x_offset = 10000;
+    if ("offset" in args) x_offset += args.offset;
+    let left = true;
+    if ("left" in args) left = args.left;
+
+    return function(t, p) {
+        return {x:((t-args.t0) * 1000 - x_offset) * (left ? 1 : -1),
+                y: 200 + 1000 / (0.01+t-args.t0),
+                z: -10000 + Math.pow(t-args.t0, 4)
             }
     }
+}
+
+function stationary_hover(args) { // x,y,z, amplitude,frequency, t0, progress)
+    return function(t, p) {
+        return {x:args.x, z:args.z + p - args.progress,
+                y:args.y + args.amplitude * Math.sin((t-args.t0)*args.frequency*2*Math.PI) }
+    }
+}
+
+function linear_noprog(x,y,z,dx,dy,dz) {
+    return function(t, progress) {
+        return {x:x + t*dx,
+                y:y + t*dy,
+                z:z + t*dz
+            }
+    }
+}
+
+const parametric_mode = {
+    "stationary":stationary,
+    "kamikaze_from_side":kamikaze_from_side,
+    "stationary_hover":stationary_hover
 }

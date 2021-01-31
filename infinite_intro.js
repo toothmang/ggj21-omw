@@ -16,47 +16,40 @@ const gridspan = 20000;
 const virtualSpeed = 5000;
 const progress_threshold = 1000;
 var world_progress = 0;
+var world_time = 0;
 var space_junk = [];
 var space_junk_worldcoords = [];
 
-var world_object_store = []; // Array of {mesh, x, y, p}
-var spherepool;
+// var world_object_store = []; // Array of {mesh, x, y, p}
+var objpools;
 var playerpool = {};    // Dictionary of playerId: mesh
 
-function fract(x) {
-    return x - Math.floor(x);
-}
-
-function InterleavedGradientNoise(x, y) {
-    return fract(52.9829189 * fract(x * 0.06711056 + y * 0.00583715));
-}
-
-function new_object(wobj, progress, x, y) {
-    world_object_store.push({ mesh: wobj, x: x, y: y, p: progress });
-    scene.add(wobj);
-}
-
-function world_object_swap(idx0, idx1) {
-    const temp = world_object_store[idx0];
-    world_object_store[idx0] = world_object_store[idx1];
-    world_object_store[idx1] = temp;
-}
-
-function world_object_nuke(index) {
-    scene.remove(world_object_store[index].mesh);
-    world_object_store[index].mesh.material.dispose();
-    if (index != world_object_store.length - 1) {
-        world_object_swap(index, world_object_store.length - 1);
-    }
-    world_object_store.pop()
-}
-
-function world_object_resurrect(index) {
-    world_object_store[index].mesh.material.color.setHex(Math.random() * 0xffffff);
-    world_object_store[index].p = -world_progress - 40000 * Math.random();
-    world_object_store[index].x = (Math.random() - .5) * 20000;
-    world_object_store[index].y = Math.random() * 5000;
-}
+// function new_object(wobj, progress, x, y) {
+//     world_object_store.push({ mesh: wobj, x: x, y: y, p: progress });
+//     scene.add(wobj);
+// }
+//
+// function world_object_swap(idx0, idx1) {
+//     const temp = world_object_store[idx0];
+//     world_object_store[idx0] = world_object_store[idx1];
+//     world_object_store[idx1] = temp;
+// }
+//
+// function world_object_nuke(index) {
+//     scene.remove(world_object_store[index].mesh);
+//     world_object_store[index].mesh.material.dispose();
+//     if (index != world_object_store.length - 1) {
+//         world_object_swap(index, world_object_store.length - 1);
+//     }
+//     world_object_store.pop()
+// }
+//
+// function world_object_resurrect(index) {
+//     world_object_store[index].mesh.material.color.setHex(Math.random() * 0xffffff);
+//     world_object_store[index].p = -world_progress - 40000 * Math.random();
+//     world_object_store[index].x = (Math.random() - .5) * 20000;
+//     world_object_store[index].y = Math.random() * 5000;
+// }
 
 var sphere_geom = new THREE.SphereGeometry(70, 32, 16);
 function new_sphere_mesh() {
@@ -70,15 +63,33 @@ function new_box_mesh() {
     return new THREE.Mesh(box_geom, box_mat);
 }
 
-function makesphere() {
-    var progress = -world_progress - 40000 * Math.random(); // Up to 10k units *ahead* of the player.
-    var sphere_mesh = new_sphere_mesh();
+// function makesphere() {
+//     var progress = -world_progress - 40000 * Math.random(); // Up to 10k units *ahead* of the player.
+//     var sphere_mesh = new_sphere_mesh();
+//
+//     new_object(sphere_mesh, progress, (Math.random() - .5) * 20000, Math.random() * 5000);
+// }
 
-    new_object(sphere_mesh, progress, (Math.random() - .5) * 20000, Math.random() * 5000);
+
+var trackedEnemies = [];
+
+function wakeEnemies() {
+    while (trackedEnemies.length > 0 && trackedEnemies[0].progress < world_progress) {
+        let enemy = trackedEnemies.shift();
+
+        let model = enemy.model;
+        if (! (model in objpools)) model = "sphere";
+
+        enemy.path = parametric_mode[enemy.mode](enemy);
+        enemy.t0 = world_time;
+
+        objpools[model].new(enemy);
+
+        console.log("Woke " +enemy.name+ " at t=" +world_time+ " and p=" +world_progress+".");
+    }
 }
 
 function test() {
-    const time = clock.getElapsedTime();
     const count = 5;
     const delay = 0.1
 
@@ -88,10 +99,10 @@ function test() {
     let start_y = 500;
     let start_z = -40000;
     for (let i = 0; i < count; i++) {
-        spherepool.new({ path: kamikaze_from_left(time + delay * i, world_progress) })
+        //spherepool.new({ path: kamikaze_from_left(world_time + delay * i, world_progress) })
         //spherepool.new( {path:stationary(start_x+delta_x*i, start_y, start_z, world_progress)} )
     }
-    console.log("New objects created at (" + start_x + ", " + start_y + ", " + start_z + "). " + spherepool.active + " active spheres.");
+    console.log("New objects created at (" + start_x + ", " + start_y + ", " + start_z + "). " + objpools["sphere"].active + " active spheres.");
 }
 document._test = test;
 
@@ -143,9 +154,9 @@ function init() {
     scene.add(grid1);
 
     // var widget = new THREE.SphereGeometry( 70, 32, 16 );
-    for (let i = 0; i < junkCount; i++) {
-        makesphere();
-    }
+    // for (let i = 0; i < junkCount; i++) {
+    //     makesphere();
+    // }
 
     scene.add(new THREE.AmbientLight(0x888888));
 
@@ -180,9 +191,24 @@ function init() {
 
     window.addEventListener('resize', onWindowResize);
 
-    spherepool = new object_pool(scene, new_sphere_mesh);
+
+    objpools = {
+    	"sphere": new object_pool(scene, new_sphere_mesh),
+    //	"tower": new object_pool(scene, new_tower_mesh),
+    //	"arch": new object_pool(scene, new_arch_mesh),
+    //	"dart": new object_pool(scene, new_dart_mesh),
+    }
 
     //playerpool = new object_pool(scene, new_box_mesh);
+
+    window.trackNewEnemy = function (enemy) {
+        trackedEnemies.push(enemy);
+    }
+
+    window.newRound = function (leveltime) {
+        // TODO: MORE CLEANUP HERE!
+        world_time = leveltime;
+    }
 }
 
 function onWindowResize() {
@@ -212,6 +238,9 @@ function render() {
     const time = clock.getElapsedTime() * 10;
 
     world_progress += virtualSpeed * delta;
+    world_time += time / 10;
+
+    wakeEnemies();
 
     // const position = geometry.attributes.position;
     //
@@ -235,30 +264,31 @@ function render() {
     grid0.position.z = world_wrap_offset;
     grid1.position.z = world_wrap_offset - gridspan;
 
-    for (let i = 0; i < world_object_store.length; i++) {
-        var progress = world_object_store[i].p + world_progress;
-
-        if (progress > progress_threshold) {
-            // makesphere();
-            // world_object_swap(i, world_object_store.length-1);
-            // world_object_nuke(world_object_store.length-1);
-            world_object_resurrect(i);
-
-            // New progress for new object....
-            progress = world_object_store[i].p + world_progress;
-        }
-
-        world_object_store[i].mesh.position.x = world_object_store[i].x;
-        world_object_store[i].mesh.position.y = world_object_store[i].y;
-        world_object_store[i].mesh.position.z = progress;
-    }
+    // for (let i = 0; i < world_object_store.length; i++) {
+    //     var progress = world_object_store[i].p + world_progress;
+    //
+    //     if (progress > progress_threshold) {
+    //         // makesphere();
+    //         // world_object_swap(i, world_object_store.length-1);
+    //         // world_object_nuke(world_object_store.length-1);
+    //         world_object_resurrect(i);
+    //
+    //         // New progress for new object....
+    //         progress = world_object_store[i].p + world_progress;
+    //     }
+    //
+    //     world_object_store[i].mesh.position.x = world_object_store[i].x;
+    //     world_object_store[i].mesh.position.y = world_object_store[i].y;
+    //     world_object_store[i].mesh.position.z = progress;
+    // }
 
     // for ( let i = 0; i < junkCount; i ++) {
     // 	space_junk[i].position.z = space_junk_worldcoords[i]["z"] + world_progress;
     // 	// space_junk[i].needsUpdate = true;  // Not needed?
     // }
 
-    spherepool.update(clock.getElapsedTime(), world_progress);
+    for (let type in objpools)
+        objpools[type].update(time / 10, world_progress);
 
     controls.update(delta);
 
@@ -281,7 +311,7 @@ function render() {
         //playerpool[playerId].rotation.z = window.playerObjects[playerId].rotz;
     }
 
-    if (channel) {
+    if (window.channelReady) {
         channel.emit("playerMove", {
             x: camera.position.x,
             y: camera.position.y,
@@ -292,7 +322,6 @@ function render() {
             qw: camera.quaternion.w,
         });
     }
-    
 
     renderer.render(scene, camera);
 }
