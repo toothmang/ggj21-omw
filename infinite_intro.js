@@ -191,8 +191,8 @@ function init() {
     spherepool = new object_pool(scene, new_sphere_mesh);
 
 
-    goal = new THREE.Object3D;
-    follow = new THREE.Object3D;
+    //goal = new THREE.Object3D;
+    //follow = new THREE.Object3D;
     
     playerObj = new THREE.Object3D;
     playerObj.position.set(0, 200, 0);
@@ -321,18 +321,23 @@ function render() {
             scene.add(playerpool[playerId]);
         }
 
-        playerpool[playerId].position.x = window.playerObjects[playerId].coords.x;
-        playerpool[playerId].position.y = window.playerObjects[playerId].coords.y;
-        playerpool[playerId].position.z = window.playerObjects[playerId].coords.z;
+        if (channel && parseInt(playerId) !== myPlayerId) {
+            playerpool[playerId].position.x = window.playerObjects[playerId].coords.x;
+            playerpool[playerId].position.y = window.playerObjects[playerId].coords.y;
+            playerpool[playerId].position.z = window.playerObjects[playerId].coords.z;
 
-        let q = new THREE.Quaternion(window.playerObjects[playerId].coords.qx,
-            window.playerObjects[playerId].coords.qy,
-            window.playerObjects[playerId].coords.qz,
-            window.playerObjects[playerId].coords.qw);
-        playerpool[playerId].setRotationFromQuaternion(q);
+            let q = new THREE.Quaternion(window.playerObjects[playerId].coords.qx,
+                window.playerObjects[playerId].coords.qy,
+                window.playerObjects[playerId].coords.qz,
+                window.playerObjects[playerId].coords.qw);
+            playerpool[playerId].setRotationFromQuaternion(q);
+        }
         //playerpool[playerId].rotation.y = window.playerObjects[playerId].roty;
         //playerpool[playerId].rotation.z = window.playerObjects[playerId].rotz;
     }
+
+    playerpool[myPlayerId].position.copy(playerObj.position);
+    playerpool[myPlayerId].setRotationFromQuaternion(playerObj.quaternion);
 
     if (channel) {
         channel.emit("playerMove", {
