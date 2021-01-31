@@ -17,9 +17,12 @@
 		<div id="info">
 			<a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> - dynamic geometry<br />
 			left click: forward, right click: backward
+			<button onclick="document._test()">Test</button>
 		</div>
 
 		<script src="https://unpkg.com/simplenoise@1.0.1/perlin.js" type="text/javascript"></script>
+		<script src="parametric.js" type="text/javascript"></script>
+		<script src="objpool.js" type="text/javascript"></script>
 
 		<script type="module">
 			// Updated to use UNPKG CDN instead of serving THREE locally.
@@ -36,7 +39,7 @@
 			//let noise2D = makeNoise2D(0);
 
 			//const worldWidth = 128, worldDepth = 128;
-			const worldWidth = 512, worldDepth = 512;
+			const worldWidth = 1024, worldDepth = 1024;
 			const junkCount = 150;
 			const gridspan = 20000;
 			const virtualSpeed = 5000;
@@ -46,6 +49,7 @@
 			var space_junk_worldcoords = [];
 
 			var world_object_store = []; // Array of {mesh, x, y, p}
+			var spherepool;
 
 			function fract(x) {
 				return x - Math.floor(x);
@@ -83,13 +87,36 @@
 			}
 
 			var sphere_geom = new THREE.SphereGeometry( 70, 32, 16 );
+			function new_sphere_mesh()
+			{
+				var sphere_mat = new THREE.MeshPhongMaterial( {color: Math.random() * 0xffffff, specular: 0x222222, shininess: Math.random() * 100} );
+				return new THREE.Mesh(sphere_geom, sphere_mat);
+			}
+
 			function makesphere() {
 				var progress = -world_progress - 40000 * Math.random(); // Up to 10k units *ahead* of the player.
-				var sphere_mat = new THREE.MeshPhongMaterial( {color: Math.random() * 0xffffff, specular: 0x222222, shininess: Math.random() * 100} );
-				var sphere_mesh = new THREE.Mesh(sphere_geom, sphere_mat);
+				var sphere_mesh = new_sphere_mesh();
 
 				new_object(sphere_mesh, progress, (Math.random() - .5) * 20000, Math.random() * 5000);
 			}
+
+			function test() {
+				const time = clock.getElapsedTime();
+				const count = 5;
+				const delay = 0.1
+
+				let start_x = (Math.random() - .5) * 2000;
+				let delta_x = 100;
+				if (Math.random() < 0.5) delta_x *= -1;
+				let start_y = 500;
+				let start_z = -40000;
+				for (let i = 0; i < count; i++) {
+					spherepool.new( {path:kamikaze_from_left(time+delay*i, world_progress)} )
+					//spherepool.new( {path:stationary(start_x+delta_x*i, start_y, start_z, world_progress)} )
+				}
+				console.log("New objects created at (" +start_x+ ", " +start_y+ ", " +start_z+ "). " +spherepool.active+ " active spheres.");
+			}
+			document._test = test;
 
 			init();
 			animate();
@@ -170,12 +197,13 @@
 				controls = new FirstPersonControls( camera, renderer.domElement );
 
 				controls.movementSpeed = 500;
-				controls.lookSpeed = 0.1;
+				controls.lookSpeed = 0.0;
 
 				//
 
 				window.addEventListener( 'resize', onWindowResize );
 
+				spherepool = new object_pool(scene, new_sphere_mesh);
 			}
 
 			function onWindowResize() {
@@ -250,6 +278,8 @@
 				// 	space_junk[i].position.z = space_junk_worldcoords[i]["z"] + world_progress;
 				// 	// space_junk[i].needsUpdate = true;  // Not needed?
 				// }
+
+				spherepool.update(clock.getElapsedTime(), world_progress);
 
 				controls.update( delta );
 				renderer.render( scene, camera );
