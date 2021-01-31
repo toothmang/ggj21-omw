@@ -1,6 +1,7 @@
 // Updated to use UNPKG CDN instead of serving THREE locally.
 import * as THREE from 'https://unpkg.com/three/build/three.module.js';
 import { FirstPersonControls } from 'https://unpkg.com/three/examples/jsm/controls/FirstPersonControls.js';
+import { FlyControls } from 'https://unpkg.com/three/examples/jsm/controls/FlyControls.js';
 
 //noise.seed(Math.random());
 
@@ -178,9 +179,7 @@ function init() {
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    controls = new FirstPersonControls(camera, renderer.domElement);
-    controls.movementSpeed = movementSpeed;
-    controls.lookSpeed = 0.05;
+
 
     gamepad = new GamepadControls();
 
@@ -201,6 +200,12 @@ function init() {
     //follow.add(camera);
     
     //follow.position.set = (0, 0, -cameraOffset);
+
+    //controls = new FirstPersonControls(playerObj, renderer.domElement);
+    controls = new FlyControls(playerObj, renderer.domElement);
+    controls.movementSpeed = movementSpeed;
+    controls.lookSpeed = 0.05;
+    controls.rollSpeed = controllerLookSpeed;
 }
 
 function onWindowResize() {
