@@ -102,7 +102,7 @@ class ServerScene {
          * const THREE = require('three')
          */
 
-        this.objects = [ground, box]
+        //this.objects = [ground, box]
         this.players = {}
 
         // clock
@@ -173,6 +173,33 @@ class ServerScene {
                     }
                 })
                 */
+            })
+
+            channel.on('fire', (data) => {
+                // Get the player that fired this
+                if (channel.playerId in this.players) {
+                    //console.log("FFFFIRE!");
+                    let pcoords = this.players[channel.playerId].coords;
+                    let bullet = this.physics.add.sphere({ 
+                        name: 'bullet', 
+                        collisionFlags: 1,
+                        x: pcoords.x, y: pcoords.y, z: pcoords.z, radius: 20, mass: 1
+                    });
+
+                    this.objects.push({
+                        physics: bullet,
+                        coords: JSON.parse(JSON.stringify(pcoords))
+                    });
+
+                    console.log("Added bullet, total of " + this.objects.length);
+
+                    bullet.body.setVelocity(0, 10, 0);
+
+                    if (this.objects.length > 100) {
+                        this.objects.shift();
+                    }
+                }
+                
             })
 
 
@@ -257,7 +284,7 @@ class ServerScene {
         let states = this.getState()
 
         if (states.objects) {
-            io.room().emit('updateObjects', [states.objects])
+            io.room().emit('updateObjects', JSON.stringify(states.objects))
         }
         if (states.players) {
             io.room().emit('updatePlayers', JSON.stringify(states.players))
@@ -276,7 +303,11 @@ class ServerScene {
     getState() {
         let objects = {}
         for (let i = 0; i < this.objects.length; i++) {
-            objects[i] = this.getObject(this.objects[i], i);
+            //objects[i] = this.getObject(this.objects[i], i);
+            objects[i] = {
+                index: i,
+                coords: this.objects[i].coords
+            }
         }
 
         let players = {}

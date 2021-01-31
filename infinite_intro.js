@@ -28,6 +28,8 @@ var world_object_store = []; // Array of {mesh, x, y, p}
 var spherepool;
 var playerpool = {};    // Dictionary of playerId: mesh
 
+var bulletpool;
+
 // For third-person camera
 var playerObj;
 
@@ -70,6 +72,12 @@ var sphere_geom = new THREE.SphereGeometry(70, 32, 16);
 function new_sphere_mesh() {
     var sphere_mat = new THREE.MeshPhongMaterial({ color: Math.random() * 0xffffff, specular: 0x222222, shininess: Math.random() * 100 });
     return new THREE.Mesh(sphere_geom, sphere_mat);
+}
+
+var bullet_mat = new THREE.MeshPhongMaterial({ color: 0xffffff, specular: 0x222222, shininess: 20 });
+var bullet_geom = new THREE.SphereGeometry(20, 4, 4);
+function new_bullet_mesh() {
+    return new THREE.Mesh(bullet_geom, bullet_mat);
 }
 
 var box_geom = new THREE.BoxGeometry(32, 16, 70);
@@ -188,17 +196,20 @@ function init() {
     window.addEventListener('resize', onWindowResize);
 
     spherepool = new object_pool(scene, new_sphere_mesh);
+    bulletpool = new object_pool(scene, new_bullet_mesh);
+
+
 
 
     //goal = new THREE.Object3D;
     //follow = new THREE.Object3D;
-    
+
     playerObj = new THREE.Object3D;
     playerObj.position.set(0, 200, 0);
     playerObj.add(camera);
     camera.position.set(0, 200, cameraOffset);
     //follow.add(camera);
-    
+
     //follow.position.set = (0, 0, -cameraOffset);
 
     //controls = new FirstPersonControls(playerObj, renderer.domElement);
@@ -230,7 +241,7 @@ function animate() {
 
     requestAnimationFrame(animate);
 
-    gamepad.update();
+    gamepad.update(clock);
 
     render();
 
@@ -319,12 +330,21 @@ function render() {
     // 	// space_junk[i].needsUpdate = true;  // Not needed?
     // }
 
-    spherepool.update(clock.getElapsedTime(), world_progress);
+    spherepool.update(clock.elapsedTime / 10, world_progress);
 
     if (controls.enabled) {
         controls.update(delta);
     }
-    
+
+    for (let objectId in window.serverObjects) {
+        let i = parseInt(objectId);
+        bulletpool.new({
+            path: linear_noprog(window.serverObjects[objectId].coords.x,
+                window.serverObjects[objectId].coords.y, window.serverObjects[objectId].coords.z,
+                0, 0, 0)
+        });
+    }
+
 
     for (let playerId in window.playerObjects) {
         if (!(playerId in playerpool)) {
@@ -347,8 +367,11 @@ function render() {
         //playerpool[playerId].rotation.z = window.playerObjects[playerId].rotz;
     }
 
-    playerpool[myPlayerId].position.copy(playerObj.position);
-    playerpool[myPlayerId].setRotationFromQuaternion(playerObj.quaternion);
+    if (myPlayerId in playerpool) {
+        playerpool[myPlayerId].position.copy(playerObj.position);
+        playerpool[myPlayerId].setRotationFromQuaternion(playerObj.quaternion);
+    }
+
 
     if (channel) {
         channel.emit("playerMove", {

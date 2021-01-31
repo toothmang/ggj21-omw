@@ -91,9 +91,10 @@ class GamepadControls {
 
         // a list of bound keys and their corresponding actions
         this.boundKeys = {};
+        this.lastFired = {};
     }
 
-    update() {
+    update(clock) {
         if (gamepadAPI.controller.buttons == null) return;
         gamepadAPI.update();
 
@@ -105,6 +106,7 @@ class GamepadControls {
         //    if (gamepadAPI.buttonNames[i] == 'A' && )
         //}
 
+        let lastFired = this.lastFired;
 
         Object.keys(gamepadAPI.buttonsStatus).forEach(function (buttonName) {
             var button = gamepadAPI.buttonsStatus[buttonName];
@@ -116,7 +118,16 @@ class GamepadControls {
                 || buttonName == 'LS'
                 || buttonName == 'RS')) {
                 //cEngine.sendInput("fire", { weapon: buttonName });
-                channel.emit("fire", { weapon: buttonName });
+                let canFire = true;
+                if (buttonName in lastFired) {
+                    let diff = clock.elapsedTime - lastFired[buttonName];
+
+                    canFire = diff > 0.125;
+                }
+                if (canFire) {
+                    channel.emit("fire", { weapon: buttonName });// { reliable: true, interval: 125, runs: 1});
+                    lastFired[buttonName] = clock.elapsedTime;
+                }
             }
         });
 

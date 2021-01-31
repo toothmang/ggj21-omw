@@ -84,19 +84,19 @@ window.addEventListener('load', () => {
         }
 
         channel.on('updateObjects', updates => {
-            //window.serverObjects = JSON.parse(updates[0])
+            window.serverObjects = JSON.parse(updates);
         })
 
         channel.on('updatePlayers', updates => {
 
             window.playerObjects = JSON.parse(updates);
 
-            if (Math.random() < 0.005) 
-            { // Stochastic logging. Use at own risk!
-                //console.log("Object " + i + " has Z coord " + pos.z + " at t=" + t + " and p=" + progress);
-                //console.log("Channel " + channel.id + " receiving updates");
-                console.log(window.playerObjects);
-            }
+            // if (Math.random() < 0.005) 
+            // { // Stochastic logging. Use at own risk!
+            //     //console.log("Object " + i + " has Z coord " + pos.z + " at t=" + t + " and p=" + progress);
+            //     //console.log("Channel " + channel.id + " receiving updates");
+            //     console.log(window.playerObjects);
+            // }
             
         })
 
