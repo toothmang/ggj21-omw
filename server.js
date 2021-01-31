@@ -135,15 +135,15 @@ class ServerScene {
 
 
             channel.on('playerMove', (data) => {
-                //if (Math.random() < 0.01) 
-                {
-                    console.log("Got playerMove from player " + channel.playerId);
-                    console.log(data);
-                }
+                // if (Math.random() < 0.01) 
+                // {
+                //     console.log("Got playerMove from player " + channel.playerId);
+                //     console.log(data);
+                // }
                 if (channel.playerId in this.players) {
                     let p = this.players[channel.playerId];
-                    console.log("Fuckin data is ")
-                    console.log(data);
+                    //console.log("Fuckin data is ")
+                    //console.log(data);
                     p.coords = data;
                     // {
                     //     x: data.x,
