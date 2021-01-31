@@ -21,6 +21,7 @@ var space_junk_worldcoords = [];
 
 var world_object_store = []; // Array of {mesh, x, y, p}
 var spherepool;
+var playerpool = {};    // Dictionary of playerId: mesh
 
 function fract(x) {
     return x - Math.floor(x);
@@ -61,6 +62,12 @@ var sphere_geom = new THREE.SphereGeometry(70, 32, 16);
 function new_sphere_mesh() {
     var sphere_mat = new THREE.MeshPhongMaterial({ color: Math.random() * 0xffffff, specular: 0x222222, shininess: Math.random() * 100 });
     return new THREE.Mesh(sphere_geom, sphere_mat);
+}
+
+var box_geom = new THREE.BoxGeometry(32, 16, 70);
+function new_box_mesh() {
+    var box_mat = new THREE.MeshPhongMaterial({ color: Math.random() * 0xffffff, specular: 0x222222, shininess: Math.random() * 100 });
+    return new THREE.Mesh(box_geom, box_mat);
 }
 
 function makesphere() {
@@ -167,13 +174,15 @@ function init() {
     controls = new FirstPersonControls(camera, renderer.domElement);
 
     controls.movementSpeed = 500;
-    controls.lookSpeed = 0.0;
+    controls.lookSpeed = 0.05;
 
     //
 
     window.addEventListener('resize', onWindowResize);
 
     spherepool = new object_pool(scene, new_sphere_mesh);
+
+    //playerpool = new object_pool(scene, new_box_mesh);
 }
 
 function onWindowResize() {
@@ -252,7 +261,38 @@ function render() {
     spherepool.update(clock.getElapsedTime(), world_progress);
 
     controls.update(delta);
+
+    for (let playerId in window.playerObjects) {
+        if (!(playerId in playerpool)) {
+            playerpool[playerId] = new_box_mesh();
+            scene.add(playerpool[playerId]);
+        }
+
+        playerpool[playerId].position.x = window.playerObjects[playerId].coords.x;
+        playerpool[playerId].position.y = window.playerObjects[playerId].coords.y;
+        playerpool[playerId].position.z = window.playerObjects[playerId].coords.z;
+
+        let q = new THREE.Quaternion(window.playerObjects[playerId].coords.qx,
+            window.playerObjects[playerId].coords.qy,
+            window.playerObjects[playerId].coords.qz,
+            window.playerObjects[playerId].coords.qw);
+        playerpool[playerId].setRotationFromQuaternion(q);
+        //playerpool[playerId].rotation.y = window.playerObjects[playerId].roty;
+        //playerpool[playerId].rotation.z = window.playerObjects[playerId].rotz;
+    }
+
+    if (channel) {
+        channel.emit("playerMove", {
+            x: camera.position.x,
+            y: camera.position.y,
+            z: camera.position.z,
+            qx: camera.quaternion.x,
+            qy: camera.quaternion.y,
+            qz: camera.quaternion.z,
+            qw: camera.quaternion.w,
+        });
+    }
+    
+
     renderer.render(scene, camera);
-
-
 }

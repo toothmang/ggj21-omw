@@ -10,14 +10,16 @@ const geckos = require('@geckos.io/client').default
 
 console.log("Clienting!");
 
-serverObjects = {};
-playerObjects = {};
+//serverObjects = {};
+//playerObjects = {};
+
+channel = null;
 
 
 window.addEventListener('load', () => {
     port = 443
     if (process.env.NODE_ENV === 'local') port = 9208
-    const channel = geckos({ port: port, portRange: { min: 50000, max: 51000 }, })
+    channel = geckos({ port: port, portRange: { min: 50000, max: 51000 }, })
 
     channel.onConnect(error => {
         if (error) console.error(error.message)
@@ -82,12 +84,30 @@ window.addEventListener('load', () => {
         }
 
         channel.on('updateObjects', updates => {
-            serverObjects = JSON.parse(updates[0])
+            //window.serverObjects = JSON.parse(updates[0])
         })
 
         channel.on('updatePlayers', updates => {
-            playerObjects = JSON.parse(updates[0])
+
+            window.playerObjects = JSON.parse(updates);
+
+            if (Math.random() < 0.005) 
+            { // Stochastic logging. Use at own risk!
+                //console.log("Object " + i + " has Z coord " + pos.z + " at t=" + t + " and p=" + progress);
+                //console.log("Channel " + channel.id + " receiving updates");
+                console.log(window.playerObjects);
+            }
+            
         })
+
+        channel.on('getId', playerId36 => {
+            this.playerId = parseInt(playerId36, 36)
+            console.log("Got player id " + this.playerId);
+            window.myPlayerId = this.playerId;
+            channel.emit('addPlayer')
+        })
+
+        channel.emit('getId')
     })
 
 
