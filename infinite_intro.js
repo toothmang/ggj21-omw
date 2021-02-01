@@ -3,6 +3,10 @@ import * as THREE from 'https://unpkg.com/three/build/three.module.js';
 import { FirstPersonControls } from 'https://unpkg.com/three/examples/jsm/controls/FirstPersonControls.js';
 import { FlyControls } from 'https://unpkg.com/three/examples/jsm/controls/FlyControls.js';
 
+//import {Ammo, Physics} from '/ammo.js'
+
+
+
 //noise.seed(Math.random());
 
 let camera, controls, scene, renderer, gamepad;
@@ -21,11 +25,12 @@ const lookSpeed = 0.05;
 const controllerLookSpeed = 2.0;
 const cameraOffset = 500.0;
 var world_progress = 0;
+var world_time = 0;
 var space_junk = [];
 var space_junk_worldcoords = [];
 
-var world_object_store = []; // Array of {mesh, x, y, p}
-var spherepool;
+// var world_object_store = []; // Array of {mesh, x, y, p}
+var objpools;
 var playerpool = {};    // Dictionary of playerId: mesh
 
 var bulletpool;
@@ -37,36 +42,32 @@ function fract(x) {
     return x - Math.floor(x);
 }
 
-function InterleavedGradientNoise(x, y) {
-    return fract(52.9829189 * fract(x * 0.06711056 + y * 0.00583715));
-}
-
-function new_object(wobj, progress, x, y) {
-    world_object_store.push({ mesh: wobj, x: x, y: y, p: progress });
-    scene.add(wobj);
-}
-
-function world_object_swap(idx0, idx1) {
-    const temp = world_object_store[idx0];
-    world_object_store[idx0] = world_object_store[idx1];
-    world_object_store[idx1] = temp;
-}
-
-function world_object_nuke(index) {
-    scene.remove(world_object_store[index].mesh);
-    world_object_store[index].mesh.material.dispose();
-    if (index != world_object_store.length - 1) {
-        world_object_swap(index, world_object_store.length - 1);
-    }
-    world_object_store.pop()
-}
-
-function world_object_resurrect(index) {
-    world_object_store[index].mesh.material.color.setHex(Math.random() * 0xffffff);
-    world_object_store[index].p = -world_progress - 40000 * Math.random();
-    world_object_store[index].x = (Math.random() - .5) * 20000;
-    world_object_store[index].y = Math.random() * 5000;
-}
+// function new_object(wobj, progress, x, y) {
+//     world_object_store.push({ mesh: wobj, x: x, y: y, p: progress });
+//     scene.add(wobj);
+// }
+//
+// function world_object_swap(idx0, idx1) {
+//     const temp = world_object_store[idx0];
+//     world_object_store[idx0] = world_object_store[idx1];
+//     world_object_store[idx1] = temp;
+// }
+//
+// function world_object_nuke(index) {
+//     scene.remove(world_object_store[index].mesh);
+//     world_object_store[index].mesh.material.dispose();
+//     if (index != world_object_store.length - 1) {
+//         world_object_swap(index, world_object_store.length - 1);
+//     }
+//     world_object_store.pop()
+// }
+//
+// function world_object_resurrect(index) {
+//     world_object_store[index].mesh.material.color.setHex(Math.random() * 0xffffff);
+//     world_object_store[index].p = -world_progress - 40000 * Math.random();
+//     world_object_store[index].x = (Math.random() - .5) * 20000;
+//     world_object_store[index].y = Math.random() * 5000;
+// }
 
 var sphere_geom = new THREE.SphereGeometry(70, 32, 16);
 function new_sphere_mesh() {
@@ -86,15 +87,35 @@ function new_box_mesh() {
     return new THREE.Mesh(box_geom, box_mat);
 }
 
-function makesphere() {
-    var progress = -world_progress - 40000 * Math.random(); // Up to 10k units *ahead* of the player.
-    var sphere_mesh = new_sphere_mesh();
+// function makesphere() {
+//     var progress = -world_progress - 40000 * Math.random(); // Up to 10k units *ahead* of the player.
+//     var sphere_mesh = new_sphere_mesh();
+//
+//     new_object(sphere_mesh, progress, (Math.random() - .5) * 20000, Math.random() * 5000);
+// }
 
-    new_object(sphere_mesh, progress, (Math.random() - .5) * 20000, Math.random() * 5000);
+
+var trackedEnemies = [];
+
+function wakeEnemies() {
+    while (trackedEnemies.length > 0 && trackedEnemies[0].progress < world_progress) {
+        let enemy = trackedEnemies.shift();
+
+        let model = enemy.model;
+        if (!(model in objpools)) model = "sphere";
+
+        enemy.path = parametric_mode[enemy.mode](enemy);
+        enemy.t0 = world_time;
+
+        objpools[model].new(enemy);
+
+        if (Math.random() < 0.001) {
+            console.log("Woke " + enemy.name + " at t=" + world_time + " and p=" + world_progress + ".");
+        }
+    }
 }
 
 function test() {
-    const time = clock.getElapsedTime();
     const count = 5;
     const delay = 0.1
 
@@ -104,15 +125,48 @@ function test() {
     let start_y = 500;
     let start_z = -40000;
     for (let i = 0; i < count; i++) {
-        spherepool.new({ path: kamikaze_from_left(time + delay * i, world_progress) })
+        //spherepool.new({ path: kamikaze_from_left(world_time + delay * i, world_progress) })
         //spherepool.new( {path:stationary(start_x+delta_x*i, start_y, start_z, world_progress)} )
     }
-    console.log("New objects created at (" + start_x + ", " + start_y + ", " + start_z + "). " + spherepool.active + " active spheres.");
+    console.log("New objects created at (" + start_x + ", " + start_y + ", " + start_z + "). " + objpools["sphere"].active + " active spheres.");
 }
 document._test = test;
 
-init();
-animate();
+var collisionConfiguration,
+    dispatcher,
+    overlappingPairCache,
+    solver,
+    dynamicsWorld,
+    groundShape,
+    bodies,
+    groundTransform,
+    bulletTrans;
+
+var bulletThreePos = new THREE.Vector3();
+
+// wait for Ammo to be loaded
+Ammo().then((ammo) => {
+    console.log('Ammo', new Ammo.btVector3(1, 2, 3).y() === 2)
+
+    collisionConfiguration = new Ammo.btDefaultCollisionConfiguration();
+    dispatcher = new Ammo.btCollisionDispatcher(collisionConfiguration);
+    overlappingPairCache = new Ammo.btDbvtBroadphase();
+    solver = new Ammo.btSequentialImpulseConstraintSolver();
+    dynamicsWorld = new Ammo.btDiscreteDynamicsWorld(dispatcher, overlappingPairCache, solver, collisionConfiguration);
+    dynamicsWorld.setGravity(new Ammo.btVector3(0, -10, 0));
+
+    groundShape = new Ammo.btBoxShape(new Ammo.btVector3(50, 50, 50));
+    bodies = [];
+    groundTransform = new Ammo.btTransform();
+    bulletTrans = new Ammo.btTransform();
+
+    groundTransform.setIdentity();
+    groundTransform.setOrigin(new Ammo.btVector3(0, -56, 0));
+
+
+    init();
+    animate();
+})
 
 function init() {
 
@@ -159,9 +213,9 @@ function init() {
     scene.add(grid1);
 
     // var widget = new THREE.SphereGeometry( 70, 32, 16 );
-    for (let i = 0; i < junkCount; i++) {
-        makesphere();
-    }
+    // for (let i = 0; i < junkCount; i++) {
+    //     makesphere();
+    // }
 
     scene.add(new THREE.AmbientLight(0x888888));
 
@@ -195,9 +249,7 @@ function init() {
 
     window.addEventListener('resize', onWindowResize);
 
-    spherepool = new object_pool(scene, new_sphere_mesh);
     bulletpool = new object_pool(scene, new_bullet_mesh);
-
 
 
 
@@ -222,6 +274,25 @@ function init() {
     renderer.domElement.addEventListener("mousemove", () => {
         controls.enabled = true;
     });
+
+
+    objpools = {
+        "sphere": new object_pool(scene, new_sphere_mesh),
+        //	"tower": new object_pool(scene, new_tower_mesh),
+        //	"arch": new object_pool(scene, new_arch_mesh),
+        //	"dart": new object_pool(scene, new_dart_mesh),
+    }
+
+    //playerpool = new object_pool(scene, new_box_mesh);
+
+    window.trackNewEnemy = function (enemy) {
+        trackedEnemies.push(enemy);
+    }
+
+    window.newRound = function (leveltime) {
+        // TODO: MORE CLEANUP HERE!
+        world_time = leveltime;
+    }
 }
 
 function onWindowResize() {
@@ -243,9 +314,61 @@ function animate() {
 
     gamepad.update(clock);
 
+    if (dynamicsWorld) {
+        dynamicsWorld.stepSimulation(1 / 60, 10);
+    }
+
     render();
 
 }
+
+window.FireBulletLocal = function (data) {
+    if (data.source in playerpool) {
+        let bulletPos = playerpool[data.source].position;
+        let forwardDir= playerpool[data.source].getWorldDirection(bulletThreePos);
+
+        let bulletIndex = bulletpool.new({
+            path: linear_noprog(bulletPos.x, bulletPos.y, bulletPos.z,
+                0, 0, 0)
+        });
+
+        // console.log("Server sez to fire a bullet!");
+        // console.log(bulletPos);
+
+        let colShape = new Ammo.btSphereShape(1),
+            startTransform = new Ammo.btTransform();
+
+        startTransform.setIdentity();
+
+        let mass = 1,
+            isDynamic = (mass !== 0),
+            localInertia = new Ammo.btVector3(0, 0, 0);
+
+        if (isDynamic)
+            colShape.calculateLocalInertia(mass, localInertia);
+
+        startTransform.setOrigin(new Ammo.btVector3(bulletPos.x, bulletPos.y, bulletPos.z));
+
+        let myMotionState = new Ammo.btDefaultMotionState(startTransform),
+            rbInfo = new Ammo.btRigidBodyConstructionInfo(mass, myMotionState, colShape, localInertia),
+            body = new Ammo.btRigidBody(rbInfo);
+
+        dynamicsWorld.addRigidBody(body);
+
+        let shotVelocity = 2000.;
+        body.setLinearVelocity(new Ammo.btVector3(-forwardDir.x * shotVelocity, 
+            -forwardDir.y * shotVelocity, -forwardDir.z * shotVelocity))
+        body.meshIndex = bulletIndex;
+        body.createTime = clock.elapsedTime;
+        bodies.push(body);
+
+        //playerpool[myPlayerId].setRotationFromQuaternion(playerObj.quaternion);
+    }
+
+
+}
+
+
 
 function render() {
 
@@ -253,6 +376,9 @@ function render() {
     const time = clock.getElapsedTime() * 10;
 
     world_progress += virtualSpeed * delta;
+    world_time += time / 10;
+
+    wakeEnemies();
 
     if (gamepad.leftStickHeld) {
         let actualMoveSpeed = movementSpeed * delta;
@@ -307,30 +433,28 @@ function render() {
     grid0.position.z = world_wrap_offset;
     grid1.position.z = world_wrap_offset - gridspan;
 
-    for (let i = 0; i < world_object_store.length; i++) {
-        var progress = world_object_store[i].p + world_progress;
-
-        if (progress > progress_threshold) {
-            // makesphere();
-            // world_object_swap(i, world_object_store.length-1);
-            // world_object_nuke(world_object_store.length-1);
-            world_object_resurrect(i);
-
-            // New progress for new object....
-            progress = world_object_store[i].p + world_progress;
-        }
-
-        world_object_store[i].mesh.position.x = world_object_store[i].x;
-        world_object_store[i].mesh.position.y = world_object_store[i].y;
-        world_object_store[i].mesh.position.z = progress;
-    }
+    // for (let i = 0; i < world_object_store.length; i++) {
+    //     var progress = world_object_store[i].p + world_progress;
+    //
+    //     if (progress > progress_threshold) {
+    //         // makesphere();
+    //         // world_object_swap(i, world_object_store.length-1);
+    //         // world_object_nuke(world_object_store.length-1);
+    //         world_object_resurrect(i);
+    //
+    //         // New progress for new object....
+    //         progress = world_object_store[i].p + world_progress;
+    //     }
+    //
+    //     world_object_store[i].mesh.position.x = world_object_store[i].x;
+    //     world_object_store[i].mesh.position.y = world_object_store[i].y;
+    //     world_object_store[i].mesh.position.z = progress;
+    // }
 
     // for ( let i = 0; i < junkCount; i ++) {
     // 	space_junk[i].position.z = space_junk_worldcoords[i]["z"] + world_progress;
     // 	// space_junk[i].needsUpdate = true;  // Not needed?
     // }
-
-    spherepool.update(clock.elapsedTime / 10, world_progress);
 
     if (controls.enabled) {
         controls.update(delta);
@@ -346,13 +470,45 @@ function render() {
     }
 
 
+    for (let type in objpools)
+        objpools[type].update(time / 10, world_progress);
+
+    bulletpool.update(time / 10, world_progress);
+    let bodiesToDestroy = [];
+
+    bodies.forEach(function (body) {
+        if (body.getMotionState()) {
+            body.getMotionState().getWorldTransform(bulletTrans);
+            bulletpool.meshes[body.meshIndex].position.x = bulletTrans.getOrigin().x();
+            bulletpool.meshes[body.meshIndex].position.y = bulletTrans.getOrigin().y();
+            bulletpool.meshes[body.meshIndex].position.z = bulletTrans.getOrigin().z();
+            //print("world pos = " + [bulletTrans.getOrigin().x().toFixed(2), bulletTrans.getOrigin().y().toFixed(2), bulletTrans.getOrigin().z().toFixed(2)]);
+        }
+
+        if (clock.elapsedTime - body.createTime > 1) {
+            bodiesToDestroy.push(body);
+        }
+    });
+
+    for(let i = 0; i < bodiesToDestroy.length; i++) {
+        let goner = bodiesToDestroy[i];
+        let idx = bodies.indexOf(goner);
+        if (idx > -1) {
+            bodies.splice(idx, 1);
+        }
+        bulletpool.disable(goner.meshIndex);
+        dynamicsWorld.removeRigidBody(goner);
+
+        Ammo.destroy(goner);
+    }
+
     for (let playerId in window.playerObjects) {
         if (!(playerId in playerpool)) {
             playerpool[playerId] = new_box_mesh();
             scene.add(playerpool[playerId]);
         }
 
-        if (channel && parseInt(playerId) !== myPlayerId) {
+        if (window.channelReady && parseInt(playerId) !== myPlayerId) {
             playerpool[playerId].position.x = window.playerObjects[playerId].coords.x;
             playerpool[playerId].position.y = window.playerObjects[playerId].coords.y;
             playerpool[playerId].position.z = window.playerObjects[playerId].coords.z;
@@ -372,8 +528,7 @@ function render() {
         playerpool[myPlayerId].setRotationFromQuaternion(playerObj.quaternion);
     }
 
-
-    if (channel) {
+    if (window.channelReady) {
         channel.emit("playerMove", {
             x: playerObj.position.x,
             y: playerObj.position.y,

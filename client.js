@@ -28,7 +28,23 @@ window.addEventListener('load', () => {
 
         channel.on('ready', () => {
             //game.start()
-            console.log("Server says scene is ready!")
+            console.log("Server says scene is ready!");
+            window.channelReady = true;
+            //this.scene.start('GameScene', { channel: channel })
+        })
+
+        channel.on('go', (data) => {
+            //game.start()
+            console.log("Let's do this!");
+            leveltime = JSON.parse(data);
+
+            if (leveltime < 0) {
+                console.log("Level starts in " +(-leveltime)+ " seconds!");
+            } else {
+                console.log("Late to the party! Level started " +leveltime+ " seconds ago!");
+            }
+
+            window.newRound(leveltime);
             //this.scene.start('GameScene', { channel: channel })
         })
 
@@ -91,13 +107,17 @@ window.addEventListener('load', () => {
 
             window.playerObjects = JSON.parse(updates);
 
-            // if (Math.random() < 0.005) 
+            // if (Math.random() < 0.005)
             // { // Stochastic logging. Use at own risk!
             //     //console.log("Object " + i + " has Z coord " + pos.z + " at t=" + t + " and p=" + progress);
             //     //console.log("Channel " + channel.id + " receiving updates");
             //     console.log(window.playerObjects);
             // }
-            
+
+        })
+
+        channel.on('newEnemy', update => {
+            window.trackNewEnemy(JSON.parse(update));
         })
 
         channel.on('getId', playerId36 => {
@@ -108,10 +128,13 @@ window.addEventListener('load', () => {
         })
 
         channel.emit('getId')
+
+        channel.on('fire', data => {
+            window.FireBulletLocal(data);
+        });
     })
 
 
 
     //FullScreenEvent(() => resize(game))
 })
-
